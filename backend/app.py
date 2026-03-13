@@ -265,9 +265,11 @@ def _apply_event(student_id: str, event_type: str) -> int:
 
 # ── Entry point ────────────────────────────────────────────────────────────
 
+# Initialize database on startup
+os.makedirs(os.path.join(ROOT, 'database'), exist_ok=True)
+logger.init_db()
+
 if __name__ == '__main__':
-    os.makedirs(os.path.join(ROOT, 'database'), exist_ok=True)
-    logger.init_db()
     print()
     print("  [SHIELD] ExamGuard - AI Exam Proctoring System")
     print("  =============================================")
