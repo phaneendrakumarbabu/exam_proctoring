@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ExamGuard — Active Exam</title>
+<link rel="stylesheet" href="/static/css/main.css"/>
+<style>
+html, body { height:100%; overflow:hidden; }
+body { display:flex; flex-direction:column; }
+
+/* ── TOP BAR ── */
+.topbar {
+  display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+  padding:.7rem 1.5rem;
+  background:var(--surface); border-bottom:1px solid var(--border);
+  gap:1rem; z-index:50;
+}
+.tb-left  { display:flex; align-items:center; gap:.75rem; }
+.tb-right { display:flex; align-items:center; gap:.75rem; }
+.tb-logo  { font-family:var(--mono); font-size:.95rem; font-weight:700; color:var(--accent); white-space:nowrap; }
+
+.student-chip {
+  display:flex; align-items:center; gap:.4rem; padding:.3rem .7rem;
+  background:rgba(0,212,255,.06); border:1px solid rgba(0,212,255,.15);
+  border-radius:8px; font-family:var(--mono); font-size:.72rem; color:var(--accent);
+}
+
+.timer-box { font-family:var(--mono); font-size:1.55rem; font-weight:700; letter-spacing:.08em; }
+.timer-box.warn     { color:var(--warning); animation:blink 1s ease-in-out infinite; }
+.timer-box.critical { color:var(--danger);  animation:blink .5s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.45} }
+
+.fs-chip {
+  display:flex; align-items:center; gap:.35rem; padding:.28rem .6rem;
+  border-radius:6px; font-family:var(--mono); font-size:.7rem;
+  background:rgba(0,255,136,.07); border:1px solid rgba(0,255,136,.2); color:var(--success);
+  transition:all .3s;
+}
+.fs-chip.off { background:rgba(255,56,96,.07); border-color:rgba(255,56,96,.2); color:var(--danger); }
+
+/* ── LAYOUT ── */
+.main { display:grid; grid-template-columns:1fr 310px; flex:1; overflow:hidden; }
+
+/* ── EXAM PANE ── */
+.exam-pane { display:flex; flex-direction:column; overflow:hidden; border-right:1px solid var(--border); }
+.exam-scroll { flex:1; overflow-y:auto; padding:2rem 2.5rem 3rem; }
+
+.exam-header { padding-bottom:1.5rem; margin-bottom:2rem; border-bottom:1px solid var(--border); }
+.exam-header h2 { font-size:1.3rem; font-weight:600; }
+.exam-header p  { color:var(--muted); font-size:.85rem; margin-top:.3rem; }
+.exam-meta { display:flex; gap:.6rem; flex-wrap:wrap; margin-top:.8rem; }
+
+/* Questions */
+.question {
+  background:var(--surface); border:1px solid var(--border); border-radius:14px;
+  padding:1.4rem; margin-bottom:1.1rem;
+  transition:border-color .2s;
+}
+.question:hover { border-color:rgba(0,212,255,.18); }
+.question.answered { border-left:3px solid var(--accent); }
+
+.q-num  { font-family:var(--mono); font-size:.68rem; color:var(--accent); letter-spacing:.1em; margin-bottom:.55rem; }
+.q-text { font-size:.975rem; line-height:1.65; margin-bottom:1.1rem; }
+
+.options { display:flex; flex-direction:column; gap:.5rem; }
+.option {
+  display:flex; align-items:center; gap:.7rem; padding:.65rem .9rem;
+  background:var(--panel); border:1px solid var(--border); border-radius:10px;
+  cursor:pointer; transition:all .15s; font-size:.875rem; user-select:none;
+}
+.option:hover { border-color:var(--accent); background:rgba(0,212,255,.04); }
+.option.sel   { border-color:var(--accent); background:rgba(0,212,255,.08); color:var(--accent); }
+.opt-letter {
+  width:27px; height:27px; border-radius:50%; background:var(--border);
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:.7rem; font-weight:700; flex-shrink:0; transition:all .15s;
+}
+.option.sel .opt-letter { background:var(--accent); color:#000; }
+
+.submit-row { text-align:center; margin-top:2rem; padding-top:1.5rem; border-top:1px solid var(--border); }
+.answered-count { font-family:var(--mono); font-size:.78rem; color:var(--muted); margin-bottom:1rem; }
+.answered-count span { color:var(--accent); }
+
+/* ── SIDEBAR ── */
+.sidebar { display:flex; flex-direction:column; overflow:hidden; background:var(--surface); }
+
+/* Score panel */
+.score-panel { padding:1.1rem; border-bottom:1px solid var(--border); }
+.panel-label {
+  font-family:var(--mono); font-size:.68rem; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--muted); margin-bottom:.7rem;
+  display:flex; align-items:center; gap:.4rem;
+}
+.panel-label .dot-live { width:6px; height:6px; }
+
+.score-row { display:flex; align-items:flex-end; gap:.4rem; margin-bottom:.6rem; }
+.score-big {
+  font-family:var(--mono); font-size:3rem; font-weight:700; line-height:1;
+  transition:color .5s; color:var(--success);
+}
+.score-big.s-good     { color:var(--score-good); }
+.score-big.s-medium   { color:var(--score-medium); }
+.score-big.s-low      { color:var(--score-low); }
+.score-big.s-critical { color:var(--score-critical); }
+.score-denom { font-family:var(--mono); font-size:.8rem; color:var(--muted); padding-bottom:.45rem; }
+
+.score-track { height:7px; background:var(--border); border-radius:100px; overflow:hidden; margin-bottom:.55rem; }
+.score-fill  {
+  height:100%; border-radius:100px; width:100%;
+  background:linear-gradient(90deg,var(--danger) 0%,var(--warning) 50%,var(--success) 100%);
+  transform-origin:left; transition:transform .65s cubic-bezier(.4,0,.2,1);
+}
+
+/* Camera panel */
+.cam-panel { padding:1rem; border-bottom:1px solid var(--border); }
+.cam-wrap  { position:relative; border-radius:12px; overflow:hidden; background:#000; aspect-ratio:4/3; }
+#webcam    { width:100%; height:100%; object-fit:cover; display:block; transform:scaleX(-1); }
+.cam-footer {
+  position:absolute; bottom:0; left:0; right:0;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.4rem .6rem;
+  background:linear-gradient(to top,rgba(0,0,0,.75),transparent);
+}
+.cam-rec { display:flex; align-items:center; gap:.35rem; font-family:var(--mono); font-size:.62rem; color:var(--success); }
+.face-count { font-family:var(--mono); font-size:.62rem; padding:.15rem .45rem; background:rgba(0,0,0,.6); border-radius:4px; }
+.face-count.warn { color:var(--danger); }
+
+/* No-cam placeholder */
+.cam-placeholder {
+  aspect-ratio:4/3; border-radius:12px; background:var(--panel);
+  border:2px dashed var(--border); display:flex; align-items:center; justify-content:center;
+  flex-direction:column; gap:.5rem; color:var(--muted); font-size:.8rem; display:none;
+}
+
+/* Events panel */
+.events-panel { flex:1; overflow:hidden; display:flex; flex-direction:column; padding:1rem; }
+.events-list  { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:.4rem; }
+
+.event-row {
+  display:flex; align-items:flex-start; gap:.5rem; padding:.5rem .6rem;
+  background:rgba(255,56,96,.05); border:1px solid rgba(255,56,96,.14); border-radius:8px;
+  animation:slide-in .28s ease both;
+}
+@keyframes slide-in { from{opacity:0;transform:translateX(16px)} to{opacity:1;transform:none} }
+.ev-icon { font-size:.9rem; flex-shrink:0; padding-top:.05rem; }
+.ev-info { flex:1; min-width:0; }
+.ev-label { font-family:var(--mono); font-size:.68rem; color:var(--danger); line-height:1.3; }
+.ev-time  { font-size:.62rem; color:var(--muted); margin-top:.1rem; }
+.ev-ded   { font-family:var(--mono); font-size:.7rem; color:var(--danger); font-weight:700; flex-shrink:0; }
+
+.events-empty { text-align:center; color:var(--muted); font-size:.8rem; padding:1.5rem 0; font-style:italic; }
+
+/* ── FULLSCREEN GATE ── */
+#fsGate {
+  position:fixed; inset:0; z-index:9000; background:var(--bg);
+  display:flex; align-items:center; justify-content:center; flex-direction:column;
+  gap:1.2rem; text-align:center; padding:2rem;
+  animation:page-in .4s ease both;
+}
+@keyframes page-in { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
+#fsGate .gate-icon { font-size:3.5rem; }
+#fsGate h2   { font-size:1.5rem; font-weight:600; }
+#fsGate p    { color:var(--muted); max-width:400px; line-height:1.65; font-size:.9rem; }
+.gate-list {
+  display:flex; flex-direction:column; gap:.4rem; align-items:center;
+  font-family:var(--mono); font-size:.75rem; color:var(--muted);
+}
+.gate-list li { list-style:none; display:flex; align-items:center; gap:.4rem; }
+
+/* ── REPORT MODAL ── */
+.modal-bg {
+  position:fixed; inset:0; background:rgba(0,0,0,.82); backdrop-filter:blur(12px);
+  z-index:8000; display:none; align-items:center; justify-content:center;
+}
+.modal-bg.open { display:flex; }
+.modal {
+  background:var(--surface); border:1px solid var(--border); border-radius:22px;
+  padding:2.5rem; max-width:500px; width:93%;
+  box-shadow:0 24px 80px rgba(0,0,0,.55);
+  animation:modal-in .3s cubic-bezier(.4,0,.2,1) both;
+}
+@keyframes modal-in { from{opacity:0;transform:scale(.94)} to{opacity:1;transform:none} }
+.modal h2    { font-size:1.35rem; margin-bottom:.25rem; }
+.modal .sub  { color:var(--muted); font-size:.875rem; margin-bottom:2rem; }
+
+.report-grid { display:grid; grid-template-columns:1fr 1fr; gap:.9rem; margin-bottom:1.5rem; }
+.report-stat {
+  background:var(--panel); border:1px solid var(--border); border-radius:12px;
+  padding:1rem; text-align:center;
+}
+.report-stat .rv  { font-family:var(--mono); font-size:1.8rem; font-weight:700; }
+.report-stat .rl  { font-size:.75rem; color:var(--muted); margin-top:.2rem; }
+
+.event-breakdown { margin-bottom:1.5rem; }
+.event-breakdown h4 { font-size:.85rem; font-weight:600; margin-bottom:.6rem; color:var(--muted); }
+.breakdown-list { display:flex; flex-direction:column; gap:.35rem; max-height:120px; overflow-y:auto; }
+.breakdown-item {
+  display:flex; justify-content:space-between; align-items:center;
+  font-family:var(--mono); font-size:.72rem; padding:.3rem .5rem;
+  background:var(--panel); border-radius:6px;
+}
+.breakdown-item span:last-child { color:var(--danger); }
+</style>
+</head>
+<body>
+
+<!-- Fullscreen gate (shown until exam starts) -->
+<div id="fsGate">
+  <div class="gate-icon">🛡️</div>
+  <h2>ExamGuard Proctored Exam</h2>
+  <p>This exam requires <strong>fullscreen mode</strong> and <strong>webcam access</strong>. Your screen, camera, and browser activity will be monitored throughout.</p>
+  <ul class="gate-list">
+    <li>✓ Keep your face visible in the camera at all times</li>
+    <li>✓ Do not switch tabs or minimize the window</li>
+    <li>✓ No phones, books, or notes allowed</li>
+    <li>✓ Stay in fullscreen for the duration of the exam</li>
+  </ul>
+  <button class="btn btn-primary" style="padding:.9rem 2rem;font-size:.9rem;" onclick="launchExam()">
+    🎓 &nbsp; Enter Fullscreen &amp; Begin Exam
+  </button>
+  <p style="font-size:.75rem;color:var(--muted);">Student: <strong id="gateStudent" style="color:var(--accent)"></strong></p>
+</div>
+
+<!-- Main UI (hidden until exam starts) -->
+<div id="examUI" style="display:none;flex-direction:column;height:100vh;">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="tb-left">
+      <span class="tb-logo">🛡️ ExamGuard</span>
+      <span class="student-chip" id="studentChip">👤 —</span>
+    </div>
+    <div>
+      <div class="timer-box" id="timerEl">01:30:00</div>
+    </div>
+    <div class="tb-right">
+      <div class="fs-chip" id="fsChip">⛶ Fullscreen</div>
+      <button class="btn btn-danger-ghost" onclick="confirmEnd()">End Exam</button>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="main">
+    <!-- Exam pane -->
+    <div class="exam-pane">
+      <div class="exam-scroll" id="examScroll">
+        <div class="exam-header">
+          <h2>Computer Science — Fundamentals Examination</h2>
+          <p>Read each question carefully and select the best answer. All questions carry equal marks.</p>
+          <div class="exam-meta">
+            <span class="pill pill-accent">📋 10 Questions</span>
+            <span class="pill pill-purple">⏱ 90 Minutes</span>
+            <span class="pill pill-success">📊 100 Points</span>
+            <span class="pill pill-warning">🔒 AI Monitored</span>
+          </div>
+        </div>
+
+        <div id="qContainer"></div>
+
+        <div class="submit-row">
+          <div class="answered-count">Answered: <span id="answeredCount">0</span> / 10</div>
+          <button class="btn btn-primary" style="padding:.85rem 2.2rem;font-size:.875rem;" onclick="submitExam()">
+            Submit Exam →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- Score -->
+      <div class="score-panel">
+        <div class="panel-label"><span class="dot-live"></span> Integrity Score</div>
+        <div class="score-row">
+          <div class="score-big" id="scoreBig">100</div>
+          <div class="score-denom">/ 100</div>
+        </div>
+        <div class="score-track"><div class="score-fill" id="scoreFill"></div></div>
+        <span class="pill pill-success" id="trustPill">✓ Excellent</span>
+      </div>
+
+      <!-- Camera -->
+      <div class="cam-panel">
+        <div class="panel-label"><span class="dot-live"></span> Live Webcam</div>
+        <div class="cam-wrap">
+          <video id="webcam" autoplay muted playsinline></video>
+          <canvas id="captureCanvas" style="display:none"></canvas>
+          <div class="cam-footer">
+            <div class="cam-rec"><span class="dot-live"></span> REC</div>
+            <div class="face-count" id="faceLabel">👤 1 face</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detection Metrics -->
+      <div class="cam-panel" style="padding:.8rem;">
+        <div class="panel-label"><span class="dot-live"></span> Detection Status</div>
+        <div style="display:flex;flex-direction:column;gap:.5rem;font-size:.75rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem .5rem;background:var(--panel);border-radius:6px;">
+            <span style="color:var(--muted)">Face Detected</span>
+            <span id="faceDetected" style="color:var(--success);font-weight:700">✓ Yes</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem .5rem;background:var(--panel);border-radius:6px;">
+            <span style="color:var(--muted)">Looking Away</span>
+            <span id="lookingAway" style="color:var(--success);font-weight:700">✓ No</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem .5rem;background:var(--panel);border-radius:6px;">
+            <span style="color:var(--muted)">Head Turned</span>
+            <span id="headTurned" style="color:var(--success);font-weight:700">✓ No</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem .5rem;background:var(--panel);border-radius:6px;">
+            <span style="color:var(--muted)">Fullscreen</span>
+            <span id="fullscreenStatus" style="color:var(--success);font-weight:700">✓ Yes</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem .5rem;background:var(--panel);border-radius:6px;">
+            <span style="color:var(--muted)">Tab Active</span>
+            <span id="tabActive" style="color:var(--success);font-weight:700">✓ Yes</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem .5rem;background:var(--panel);border-radius:6px;">
+            <span style="color:var(--muted)">Copy/Paste</span>
+            <span id="copyPasteStatus" style="color:var(--success);font-weight:700">✓ Blocked</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Events -->
+      <div class="events-panel">
+        <div class="panel-label"><span class="dot-live"></span> Suspicious Events</div>
+        <div class="events-list" id="evList">
+          <div class="events-empty" id="evEmpty">No events detected ✓</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Report Modal -->
+<div class="modal-bg" id="reportModal">
+  <div class="modal">
+    <h2>📊 Exam Complete</h2>
+    <p class="sub">Your integrity report for this session</p>
+    <div class="report-grid">
+      <div class="report-stat">
+        <div class="rv" id="rScore" style="color:var(--success)">—</div>
+        <div class="rl">Integrity Score</div>
+      </div>
+      <div class="report-stat">
+        <div class="rv" id="rTrust" style="font-size:1.15rem;padding-top:.35rem">—</div>
+        <div class="rl">Trust Level</div>
+      </div>
+      <div class="report-stat">
+        <div class="rv" id="rEvents">0</div>
+        <div class="rl">Events Flagged</div>
+      </div>
+      <div class="report-stat">
+        <div class="rv" id="rDuration">—</div>
+        <div class="rl">Exam Duration</div>
+      </div>
+    </div>
+    <div class="event-breakdown" id="breakdownSection" style="display:none">
+      <h4>Event Breakdown</h4>
+      <div class="breakdown-list" id="breakdownList"></div>
+    </div>
+    <button class="btn btn-primary" style="width:100%;padding:.9rem;font-size:.85rem;justify-content:center;" onclick="exitToLogin()">
+      Exit Exam System
+    </button>
+  </div>
+</div>
+
+<script src="/static/js/examguard.js"></script>
+<script src="/static/js/proctor.js"></script>
+<script>
+/* ── State ── */
+const STUDENT_ID   = EG.session.studentId   || 'DEMO';
+const STUDENT_NAME = EG.session.studentName || 'Student';
+let integrity      = 100;
+let examRunning    = false;
+let examStart      = null;
+let timerSecs      = 90 * 60;
+let timerInterval  = null;
+let answersMap     = {};
+let proctor        = null;
+let eventCounts    = {};
+
+document.getElementById('gateStudent').textContent = `${STUDENT_ID} — ${STUDENT_NAME}`;
+
+/* ── Questions ── */
+const QUESTIONS = [
+  { q:"Which data structure operates on a Last-In, First-Out (LIFO) principle?",
+    opts:["Queue","Stack","Linked List","Binary Tree"], ans:1 },
+  { q:"What is the time complexity of binary search on a sorted array of n elements?",
+    opts:["O(n)","O(n²)","O(log n)","O(1)"], ans:2 },
+  { q:"Which of the following is NOT an object-oriented programming concept?",
+    opts:["Inheritance","Polymorphism","Compilation","Encapsulation"], ans:2 },
+  { q:"In a relational database, what does SQL stand for?",
+    opts:["Structured Query Language","Simple Queue Logic","System Query Level","Standard Query List"], ans:0 },
+  { q:"Which HTTP status code indicates a successful response?",
+    opts:["404","500","302","200"], ans:3 },
+  { q:"What does CPU stand for in computer architecture?",
+    opts:["Central Processing Unit","Computer Power Unit","Core Program Utility","Central Program Update"], ans:0 },
+  { q:"Which sorting algorithm has the best average-case time complexity?",
+    opts:["Bubble Sort","Insertion Sort","Quick Sort","Selection Sort"], ans:2 },
+  { q:"In networking, what does IP stand for?",
+    opts:["Internal Protocol","Internet Protocol","Interface Path","Integrated Process"], ans:1 },
+  { q:"Which programming paradigm treats computation as the evaluation of mathematical functions?",
+    opts:["Object-Oriented","Imperative","Functional","Procedural"], ans:2 },
+  { q:"What is the primary purpose of an operating system?",
+    opts:["To run web browsers","To manage hardware and software resources","To provide internet connectivity","To store user files"], ans:1 },
+];
+
+function renderQuestions() {
+  const L = ['A','B','C','D'];
+  document.getElementById('qContainer').innerHTML = QUESTIONS.map((q,i) => `
+    <div class="question" id="q${i}">
+      <div class="q-num">QUESTION ${String(i+1).padStart(2,'0')} / ${QUESTIONS.length}</div>
+      <div class="q-text">${q.q}</div>
+      <div class="options">
+        ${q.opts.map((o,j) => `
+          <div class="option" id="opt_${i}_${j}" onclick="pick(${i},${j})">
+            <span class="opt-letter">${L[j]}</span>
+            <span>${o}</span>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function pick(qi, oi) {
+  answersMap[qi] = oi;
+  QUESTIONS[qi].opts.forEach((_,j) => {
+    document.getElementById(`opt_${qi}_${j}`).classList.toggle('sel', j===oi);
+  });
+  document.getElementById(`q${qi}`).classList.add('answered');
+  document.getElementById('answeredCount').textContent = Object.keys(answersMap).length;
+}
+
+/* ── Exam launch ── */
+async function launchExam() {
+  proctor = new ProctorMonitor({
+    studentId: STUDENT_ID,
+    onScore:   updateScore,
+    onEvent:   handleEvent,
+    frameInterval: 4000,
+  });
+
+  try {
+    await proctor.start(document.getElementById('webcam'));
+  } catch (e) {
+    alert('⚠ ' + e.message);
+    return;
+  }
+
+  document.getElementById('fsGate').style.display = 'none';
+  const ui = document.getElementById('examUI');
+  ui.style.display = 'flex';
+
+  document.getElementById('studentChip').textContent = `👤 ${STUDENT_ID}`;
+  examStart   = Date.now();
+  examRunning = true;
+
+  renderQuestions();
+  startTimer();
+  trackFullscreenUI();
+  blockCopyPaste();
+}
+
+/* ── Timer ── */
+function startTimer() {
+  timerInterval = setInterval(() => {
+    timerSecs--;
+    const el = document.getElementById('timerEl');
+    el.textContent = EG.fmtTime(timerSecs, true);
+    el.className = 'timer-box' + (timerSecs < 300 ? ' critical' : timerSecs < 600 ? ' warn' : '');
+    if (timerSecs <= 0) submitExam();
+  }, 1000);
+}
+
+/* ── Fullscreen chip ── */
+function trackFullscreenUI() {
+  const updateChip = () => {
+    const chip = document.getElementById('fsChip');
+    const on = !!document.fullscreenElement;
+    chip.className = 'fs-chip' + (on ? '' : ' off');
+    chip.textContent = on ? '⛶ Fullscreen' : '⛶ Windowed';
+  };
+  document.addEventListener('fullscreenchange', updateChip);
+  updateChip();
+}
+
+/* ── Score update ── */
+function updateScore(s) {
+  integrity = Math.max(0, Math.min(100, s));
+  const el   = document.getElementById('scoreBig');
+  el.textContent = Math.round(integrity);
+  el.className = 'score-big' +
+    (integrity>=75?'': integrity>=60?' s-good': integrity>=40?' s-medium': ' s-low');
+  // Wait — fix these class names to match CSS
+  if      (integrity>=90) el.className='score-big';
+  else if (integrity>=75) el.className='score-big s-good';
+  else if (integrity>=60) el.className='score-big s-medium';
+  else if (integrity>=40) el.className='score-big s-low';
+  else                    el.className='score-big s-critical';
+
+  document.getElementById('scoreFill').style.transform = `scaleX(${integrity/100})`;
+
+  const trust = EG.trustInfo(integrity);
+  const pill  = document.getElementById('trustPill');
+  pill.textContent = (integrity>=75?'✓ ':'⚠ ') + trust.level;
+  pill.className   = `pill ${trust.pillCls}`;
+}
+
+/* ── Event handler ── */
+function handleEvent(type, note) {
+  // Handle analysis data
+  if (type === '__analysis__' && note) {
+    const analysis = note;
+    // Update face detection status based on actual face count
+    if (analysis.faces === 0) {
+      document.getElementById('faceDetected').textContent = '✗ No';
+      document.getElementById('faceDetected').style.color = 'var(--danger)';
+      document.getElementById('faceLabel').innerHTML='<span class="face-count warn">⚠ No face</span>';
+    } else if (analysis.faces === 1) {
+      document.getElementById('faceDetected').textContent = '✓ Yes';
+      document.getElementById('faceDetected').style.color = 'var(--success)';
+      document.getElementById('faceLabel').innerHTML='<span class="face-count">👤 1 face</span>';
+    } else if (analysis.faces > 1) {
+      document.getElementById('faceDetected').textContent = '⚠ Multiple';
+      document.getElementById('faceDetected').style.color = 'var(--warning)';
+      document.getElementById('faceLabel').innerHTML='<span class="face-count warn">⚠ '+analysis.faces+' faces</span>';
+    }
+    
+    // Update other detection statuses
+    if (analysis.looking_away) {
+      document.getElementById('lookingAway').textContent = '✗ Yes';
+      document.getElementById('lookingAway').style.color = 'var(--danger)';
+    } else {
+      document.getElementById('lookingAway').textContent = '✓ No';
+      document.getElementById('lookingAway').style.color = 'var(--success)';
+    }
+    
+    if (analysis.head_turned) {
+      document.getElementById('headTurned').textContent = '✗ Yes';
+      document.getElementById('headTurned').style.color = 'var(--danger)';
+    } else {
+      document.getElementById('headTurned').textContent = '✓ No';
+      document.getElementById('headTurned').style.color = 'var(--success)';
+    }
+    
+    return;
+  }
+  
+  if (type === '__warning__') return; // just a local warning, no penalty
+  if (!eventCounts[type]) eventCounts[type] = 0;
+  eventCounts[type]++;
+
+  // Update detection status
+  updateDetectionStatus(type);
+
+  // Face count label
+  if (type === 'no_face')        {
+    document.getElementById('faceLabel').innerHTML='<span class="face-count warn">⚠ No face</span>';
+    document.getElementById('faceDetected').textContent = '✗ No';
+    document.getElementById('faceDetected').style.color = 'var(--danger)';
+  }
+  if (type === 'multiple_faces') {
+    document.getElementById('faceLabel').innerHTML='<span class="face-count warn">⚠ Multiple faces</span>';
+    document.getElementById('faceDetected').textContent = '⚠ Multiple';
+    document.getElementById('faceDetected').style.color = 'var(--warning)';
+  }
+
+  // Event log row
+  const meta = EG.EVENT_META[type] || { icon:'⚠', label: type };
+  const ded  = EG.PENALTIES[type]  || 5;
+
+  document.getElementById('evEmpty').style.display = 'none';
+  const list = document.getElementById('evList');
+  const row  = document.createElement('div');
+  row.className = 'event-row';
+  row.innerHTML = `
+    <span class="ev-icon">${meta.icon}</span>
+    <div class="ev-info">
+      <div class="ev-label">${meta.label}</div>
+      <div class="ev-time">${new Date().toLocaleTimeString()}</div>
+    </div>
+    <span class="ev-ded">−${ded}</span>`;
+  list.insertBefore(row, list.firstChild);
+
+  // Cap list at 30 items
+  while (list.children.length > 31) list.removeChild(list.lastChild);
+}
+
+/* ── Update detection status ── */
+function updateDetectionStatus(type) {
+  const statusMap = {
+    'no_face': { el: 'faceDetected', text: '✗ No', color: 'var(--danger)' },
+    'multiple_faces': { el: 'faceDetected', text: '⚠ Multiple', color: 'var(--warning)' },
+    'looking_away': { el: 'lookingAway', text: '✗ Yes', color: 'var(--danger)' },
+    'head_turned': { el: 'headTurned', text: '✗ Yes', color: 'var(--danger)' },
+    'fullscreen_exit': { el: 'fullscreenStatus', text: '✗ No', color: 'var(--danger)' },
+    'tab_switch': { el: 'tabActive', text: '✗ No', color: 'var(--danger)' },
+  };
+
+  if (statusMap[type]) {
+    const status = statusMap[type];
+    const el = document.getElementById(status.el);
+    if (el) {
+      el.textContent = status.text;
+      el.style.color = status.color;
+    }
+  }
+}
+
+/* ── Block copy/paste ── */
+function blockCopyPaste() {
+  const handleCopyPaste = (e) => {
+    e.preventDefault();
+    EG.toast('Copy/Paste is disabled during exam', 'danger', 2000);
+    handleEvent('copy_paste_attempt', 'User attempted to copy/paste');
+    return false;
+  };
+
+  // Block copy
+  document.addEventListener('copy', handleCopyPaste);
+  // Block paste
+  document.addEventListener('paste', handleCopyPaste);
+  // Block cut
+  document.addEventListener('cut', handleCopyPaste);
+  // Block right-click context menu
+  document.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    EG.toast('Right-click is disabled during exam', 'danger', 2000);
+    return false;
+  });
+  // Block keyboard shortcuts (Ctrl+C, Ctrl+X, Ctrl+V)
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'x' || e.key === 'v')) {
+      e.preventDefault();
+      EG.toast('Keyboard shortcuts are disabled during exam', 'danger', 2000);
+      handleEvent('keyboard_shortcut_attempt', 'User attempted keyboard shortcut');
+      return false;
+    }
+  });
+}
+
+/* ── End ── */
+function confirmEnd() {
+  if (confirm('Submit and end the exam now?')) submitExam();
+}
+
+async function submitExam() {
+  if (!examRunning) return;
+  examRunning = false;
+  clearInterval(timerInterval);
+  proctor?.stop();
+
+  const elapsed = examStart ? Math.round((Date.now()-examStart)/1000) : 0;
+
+  // Fetch report from backend
+  try {
+    const data = await EG.get(`/api/report/${STUDENT_ID}`);
+    showReport(data, elapsed);
+  } catch {
+    showReport({ integrity_score:integrity, trust_level:EG.trustInfo(integrity).level, total_events:Object.values(eventCounts).reduce((a,b)=>a+b,0) }, elapsed);
+  }
+}
+
+function showReport(data, elapsed) {
+  const score  = Math.round(data.integrity_score ?? integrity);
+  const trust  = data.trust_level || EG.trustInfo(score).level;
+  const events = data.total_events ?? 0;
+  const ti     = EG.trustInfo(score);
+
+  document.getElementById('rScore').textContent   = `${score}/100`;
+  document.getElementById('rScore').className     = `rv ${ti.cls}`;
+  document.getElementById('rTrust').textContent   = trust;
+  document.getElementById('rEvents').textContent  = events;
+  document.getElementById('rDuration').textContent= EG.fmtTime(elapsed, true);
+
+  // Breakdown
+  const keys = Object.keys(eventCounts);
+  if (keys.length) {
+    document.getElementById('breakdownSection').style.display='block';
+    document.getElementById('breakdownList').innerHTML = keys.map(k => {
+      const m = EG.EVENT_META[k] || { icon:'⚠', label:k };
+      return `<div class="breakdown-item"><span>${m.icon} ${m.label}</span><span>×${eventCounts[k]} (−${eventCounts[k]*EG.PENALTIES[k]})</span></div>`;
+    }).join('');
+  }
+
+  document.getElementById('reportModal').classList.add('open');
+}
+
+function exitToLogin() {
+  EG.session.clear();
+  location.href = '/';
+}
+</script>
+</body>
+</html>

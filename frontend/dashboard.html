@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ExamGuard — Admin Dashboard</title>
+<link rel="stylesheet" href="/static/css/main.css"/>
+<style>
+html,body { height:100%; }
+body { display:flex; flex-direction:column; overflow:hidden; }
+
+/* ── NAV ── */
+.nav {
+  display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+  padding:.85rem 2rem; background:var(--surface); border-bottom:1px solid var(--border);
+  position:sticky; top:0; z-index:100;
+}
+.nav-logo { font-family:var(--mono); font-size:1.05rem; font-weight:700; color:var(--accent); display:flex; align-items:center; gap:.5rem; }
+.nav-logo span { color:var(--muted); font-size:.7rem; font-weight:400; }
+.nav-links { display:flex; gap:1rem; }
+.nav-link {
+  font-family:var(--mono); font-size:.72rem; color:var(--muted);
+  text-decoration:none; padding:.3rem .7rem; border-radius:6px; transition:all .2s;
+}
+.nav-link:hover,.nav-link.active { color:var(--accent); background:rgba(0,212,255,.08); }
+
+/* ── CONTENT ── */
+.content { flex:1; overflow-y:auto; padding:1.75rem 2rem 3rem; }
+
+/* ── STATS ── */
+.stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.75rem; }
+.stat {
+  background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:1.2rem;
+  display:flex; flex-direction:column; gap:.6rem;
+}
+.stat-top { display:flex; align-items:flex-start; justify-content:space-between; }
+.stat-icon {
+  width:38px; height:38px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center; font-size:1.1rem;
+}
+.si-blue   { background:rgba(0,212,255,.1); }
+.si-green  { background:rgba(0,255,136,.1); }
+.si-yellow { background:rgba(255,170,0,.1); }
+.si-red    { background:rgba(255,56,96,.1);  }
+.stat-val  { font-family:var(--mono); font-size:2.2rem; font-weight:700; line-height:1; }
+.stat-lbl  { font-size:.78rem; color:var(--muted); }
+.stat-delta { font-family:var(--mono); font-size:.68rem; }
+.delta-up   { color:var(--success); }
+.delta-warn { color:var(--warning); }
+
+/* ── GRID ── */
+.dash-grid { display:grid; grid-template-columns:1fr 360px; gap:1.5rem; align-items:start; }
+
+/* ── TABLE ── */
+.tbl-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; }
+th {
+  font-family:var(--mono); font-size:.65rem; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--muted); padding:.7rem 1rem;
+  text-align:left; border-bottom:1px solid var(--border); background:var(--panel);
+  white-space:nowrap;
+}
+td { padding:.7rem 1rem; border-bottom:1px solid rgba(26,37,64,.5); font-size:.85rem; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:rgba(0,212,255,.018); }
+
+/* ── Score mini-bar ── */
+.score-cell { display:flex; align-items:center; gap:.6rem; }
+.mini-bar   { flex:1; height:5px; background:var(--border); border-radius:100px; overflow:hidden; max-width:60px; }
+.mini-fill  { height:100%; border-radius:100px; background:linear-gradient(90deg,var(--danger),var(--warning) 50%,var(--success)); transform-origin:left; }
+
+/* ── Right column ── */
+.right-col { display:flex; flex-direction:column; gap:1.2rem; }
+
+/* System status */
+.sys-row {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.6rem 1rem; border-bottom:1px solid rgba(26,37,64,.5); font-size:.82rem;
+}
+.sys-row:last-child { border-bottom:none; }
+.sys-key { color:var(--muted); }
+.sys-val { font-family:var(--mono); font-size:.75rem; }
+.ok   { color:var(--success); }
+.fail { color:var(--danger); }
+.warn { color:var(--warning); }
+
+/* Activity feed */
+.feed { padding:.75rem; max-height:340px; overflow-y:auto; display:flex; flex-direction:column; gap:.4rem; }
+.feed-item {
+  display:flex; align-items:flex-start; gap:.6rem; padding:.6rem .7rem;
+  background:var(--panel); border:1px solid var(--border); border-radius:9px;
+  animation:slide-in .25s ease both;
+}
+@keyframes slide-in { from{opacity:0;transform:translateX(12px)} to{opacity:1;transform:none} }
+.fi-icon { font-size:1rem; flex-shrink:0; }
+.fi-body { flex:1; }
+.fi-title{ font-size:.82rem; font-weight:500; }
+.fi-meta { font-family:var(--mono); font-size:.65rem; color:var(--muted); margin-top:.15rem; }
+.fi-ded  { font-family:var(--mono); font-size:.72rem; color:var(--danger); font-weight:700; flex-shrink:0; }
+
+.empty-state { text-align:center; color:var(--muted); padding:2.5rem; font-size:.85rem; }
+
+/* Refresh btn */
+.refresh-btn {
+  display:flex; align-items:center; gap:.35rem; padding:.3rem .7rem;
+  background:rgba(0,212,255,.06); border:1px solid rgba(0,212,255,.18); border-radius:6px;
+  font-family:var(--mono); font-size:.7rem; color:var(--accent); cursor:pointer; transition:all .2s;
+}
+.refresh-btn:hover { background:rgba(0,212,255,.12); }
+.refreshing { animation:spin .6s linear infinite; }
+
+/* Event type pills */
+.event-type-badge {
+  display:inline-flex; align-items:center; gap:.25rem;
+  padding:.15rem .45rem; border-radius:4px; font-family:var(--mono); font-size:.65rem;
+  background:rgba(255,56,96,.08); color:var(--danger); border:1px solid rgba(255,56,96,.15);
+}
+
+/* ── Connection banner ── */
+.offline-banner {
+  display:none; background:rgba(255,56,96,.1); border:1px solid rgba(255,56,96,.25);
+  border-radius:10px; padding:.75rem 1rem; margin-bottom:1.5rem;
+  font-size:.85rem; color:#ff8099; align-items:center; gap:.5rem;
+}
+.offline-banner.show { display:flex; }
+</style>
+</head>
+<body>
+<div class="nav">
+  <div class="nav-logo">
+    🛡️ ExamGuard
+    <span>/ Admin Dashboard</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-link active" href="/dashboard">Dashboard</a>
+    <a class="nav-link" href="/">Student Login</a>
+    <a class="nav-link" href="/exam">Exam Demo</a>
+  </div>
+  <span class="pill pill-purple">👑 Administrator</span>
+</div>
+
+<div class="content">
+
+  <div class="offline-banner" id="offlineBanner">
+    ⚠ Backend offline — showing cached data. Run: <code style="margin-left:.3rem;color:var(--accent)">python backend/app.py</code>
+  </div>
+
+  <!-- Stats row -->
+  <div class="stats-row">
+    <div class="stat">
+      <div class="stat-top">
+        <div>
+          <div class="stat-val" id="sActive">0</div>
+          <div class="stat-lbl">Active Students</div>
+        </div>
+        <div class="stat-icon si-blue">🎓</div>
+      </div>
+      <div class="stat-delta delta-up" id="sActiveDelta">— online now</div>
+    </div>
+    <div class="stat">
+      <div class="stat-top">
+        <div>
+          <div class="stat-val" id="sAvg">—</div>
+          <div class="stat-lbl">Avg Integrity</div>
+        </div>
+        <div class="stat-icon si-green">📊</div>
+      </div>
+      <div class="stat-delta" id="sAvgDelta">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-top">
+        <div>
+          <div class="stat-val" id="sEvents">0</div>
+          <div class="stat-lbl">Total Events</div>
+        </div>
+        <div class="stat-icon si-yellow">⚠️</div>
+      </div>
+      <div class="stat-delta delta-warn" id="sEventsDelta">flags logged</div>
+    </div>
+    <div class="stat">
+      <div class="stat-top">
+        <div>
+          <div class="stat-val" id="sRisk">0</div>
+          <div class="stat-lbl">At Risk (&lt;60)</div>
+        </div>
+        <div class="stat-icon si-red">🚨</div>
+      </div>
+      <div class="stat-delta delta-warn" id="sRiskDelta">need review</div>
+    </div>
+  </div>
+
+  <!-- Main grid -->
+  <div class="dash-grid">
+
+    <!-- Student table -->
+    <div>
+      <div class="card">
+        <div class="card-head">
+          <div style="display:flex;align-items:center;gap:.65rem">
+            <h3>Active Exam Sessions</h3>
+            <span class="pill pill-success" style="font-size:.65rem"><span class="dot-live" style="width:5px;height:5px"></span> &nbsp;LIVE</span>
+          </div>
+          <button class="refresh-btn" id="refreshBtn" onclick="refresh()">
+            <span id="refreshIcon">↻</span> Refresh
+          </button>
+        </div>
+        <div class="tbl-wrap">
+          <table id="studentTable">
+            <thead>
+              <tr>
+                <th>Student ID</th>
+                <th>Status</th>
+                <th>Score</th>
+                <th>Trust Level</th>
+                <th>Events</th>
+                <th>Started</th>
+                <th>Elapsed</th>
+              </tr>
+            </thead>
+            <tbody id="studentTbody">
+              <tr><td colspan="7" class="empty-state">No active exams yet. Students will appear here when they log in.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- All-time log from DB -->
+      <div class="card" style="margin-top:1.2rem">
+        <div class="card-head">
+          <h3>Flagged Events Log <span style="color:var(--muted);font-size:.75rem;font-weight:400">(STU001)</span></h3>
+          <span class="pill pill-accent" id="logCount">0 entries</span>
+        </div>
+        <div id="logContainer">
+          <div class="empty-state">No events in database yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div class="right-col">
+
+      <!-- System Status -->
+      <div class="card">
+        <div class="card-head">
+          <h3>System Status</h3>
+          <span class="pill pill-success" id="sysStatusPill"><span class="dot-live" style="width:5px;height:5px"></span>&nbsp;Online</span>
+        </div>
+        <div>
+          <div class="sys-row"><span class="sys-key">Flask API</span>      <span class="sys-val ok"  id="apiStat">Checking…</span></div>
+          <div class="sys-row"><span class="sys-key">Database</span>       <span class="sys-val ok">✓ SQLite</span></div>
+          <div class="sys-row"><span class="sys-key">Face Detection</span> <span class="sys-val ok">✓ OpenCV</span></div>
+          <div class="sys-row"><span class="sys-key">Head Pose</span>      <span class="sys-val ok">✓ MediaPipe</span></div>
+          <div class="sys-row"><span class="sys-key">Object Detect</span>  <span class="sys-val warn">⚡ YOLOv8 Optional</span></div>
+          <div class="sys-row"><span class="sys-key">Frame Rate</span>     <span class="sys-val ok">1 / 4 sec</span></div>
+          <div class="sys-row"><span class="sys-key">Auto-Refresh</span>   <span class="sys-val ok">Every 5 sec</span></div>
+        </div>
+      </div>
+
+      <!-- Penalty Reference -->
+      <div class="card">
+        <div class="card-head"><h3>Penalty Reference</h3></div>
+        <div style="padding:.5rem 0" id="penaltyRef">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Live Activity -->
+      <div class="card">
+        <div class="card-head">
+          <h3>Live Activity Feed</h3>
+          <span class="pill pill-accent" id="feedCount">0</span>
+        </div>
+        <div class="feed" id="liveFeed">
+          <div class="empty-state" style="padding:1.5rem">Waiting for activity…</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/examguard.js"></script>
+<script>
+const ICONS = EG.EVENT_META;
+
+async function refresh() {
+  const ri = document.getElementById('refreshIcon');
+  ri.classList.add('refreshing');
+
+  try {
+    // Check API
+    const students = await EG.get('/api/all-students');
+    document.getElementById('apiStat').textContent = '✓ Connected';
+    document.getElementById('apiStat').className   = 'sys-val ok';
+    document.getElementById('offlineBanner').classList.remove('show');
+    document.getElementById('sysStatusPill').className='pill pill-success';
+    document.getElementById('sysStatusPill').innerHTML='<span class="dot-live" style="width:5px;height:5px"></span>&nbsp;Online';
+
+    renderStudents(students);
+  } catch {
+    document.getElementById('apiStat').textContent = '✗ Offline';
+    document.getElementById('apiStat').className   = 'sys-val fail';
+    document.getElementById('offlineBanner').classList.add('show');
+    document.getElementById('sysStatusPill').className='pill pill-danger';
+    document.getElementById('sysStatusPill').textContent='⚠ Offline';
+  }
+
+  // Load event logs
+  try {
+    const logs = await EG.get('/api/logs/STU001');
+    renderLogs(logs);
+    renderFeed(logs);
+  } catch {}
+
+  setTimeout(()=>ri.classList.remove('refreshing'), 500);
+}
+
+function renderStudents(list) {
+  const tbody = document.getElementById('studentTbody');
+  if (!list.length) {
+    tbody.innerHTML='<tr><td colspan="7" class="empty-state">No active exams. Waiting for students to log in…</td></tr>';
+    ['sActive','sAvg','sEvents','sRisk'].forEach(id=>document.getElementById(id).textContent='0');
+    return;
+  }
+
+  let total=0, risk=0, evTotal=0;
+  tbody.innerHTML = list.map(([sid, sess]) => {
+    const score   = Math.round(sess.integrity_score ?? 100);
+    const events  = (sess.events||[]).length;
+    const ti      = EG.trustInfo(score);
+    const started = sess.exam_start ? new Date(sess.exam_start).toLocaleTimeString() : '—';
+    const elapsed = sess.exam_start ? EG.elapsed(sess.exam_start) : '—';
+    total += score; evTotal += events;
+    if (score < 60) risk++;
+    return `
+      <tr>
+        <td><strong style="font-family:var(--mono);font-size:.82rem">${sid}</strong></td>
+        <td><span class="dot-live" style="display:inline-block"></span> <span style="font-size:.78rem;color:var(--success);margin-left:.3rem">Active</span></td>
+        <td>
+          <div class="score-cell">
+            <span class="${ti.cls}" style="font-family:var(--mono);font-size:.85rem;font-weight:700">${score}</span>
+            <div class="mini-bar"><div class="mini-fill" style="transform:scaleX(${score/100})"></div></div>
+          </div>
+        </td>
+        <td><span class="pill ${ti.pillCls}" style="font-size:.68rem">${ti.level}</span></td>
+        <td style="font-family:var(--mono);font-size:.78rem;color:${events>0?'var(--warning)':'var(--muted)'}">${events}</td>
+        <td style="font-size:.75rem;color:var(--muted)">${started}</td>
+        <td style="font-family:var(--mono);font-size:.75rem;color:var(--muted)">${elapsed}</td>
+      </tr>`;
+  }).join('');
+
+  document.getElementById('sActive').textContent = list.length;
+  document.getElementById('sAvg').textContent    = Math.round(total/list.length);
+  document.getElementById('sEvents').textContent = evTotal;
+  document.getElementById('sRisk').textContent   = risk;
+
+  const avg = Math.round(total/list.length);
+  const avgEl = document.getElementById('sAvgDelta');
+  avgEl.textContent = avg>=75?'✓ Good standing':avg>=60?'⚠ Caution':'✗ At risk';
+  avgEl.className = 'stat-delta ' + (avg>=75?'delta-up':'delta-warn');
+}
+
+function renderLogs(logs) {
+  document.getElementById('logCount').textContent = logs.length + ' entries';
+  if (!logs.length) {
+    document.getElementById('logContainer').innerHTML='<div class="empty-state">No events logged yet.</div>';
+    return;
+  }
+  const rows = logs.slice(0,40).map(l => {
+    const m = ICONS[l.event_type] || {icon:'⚠', label:l.event_type};
+    return `
+      <div style="display:flex;align-items:center;gap:.6rem;padding:.55rem 1rem;border-bottom:1px solid rgba(26,37,64,.5);font-size:.82rem;">
+        <span>${m.icon}</span>
+        <span class="event-type-badge">${m.label}</span>
+        <span style="flex:1;color:var(--muted);font-family:var(--mono);font-size:.68rem">${l.student_id}</span>
+        <span style="font-family:var(--mono);font-size:.68rem;color:var(--danger)">−${l.score_deduction}</span>
+        <span style="font-size:.68rem;color:var(--muted)">${new Date(l.timestamp).toLocaleTimeString()}</span>
+      </div>`;
+  }).join('');
+  document.getElementById('logContainer').innerHTML = rows;
+}
+
+function renderFeed(logs) {
+  const feed = document.getElementById('liveFeed');
+  document.getElementById('feedCount').textContent = logs.length;
+  if (!logs.length) {
+    feed.innerHTML='<div class="empty-state" style="padding:1.5rem">No events yet.</div>';
+    return;
+  }
+  feed.innerHTML = logs.slice(0,15).map(l => {
+    const m = ICONS[l.event_type] || {icon:'⚠', label:l.event_type};
+    return `
+      <div class="feed-item">
+        <span class="fi-icon">${m.icon}</span>
+        <div class="fi-body">
+          <div class="fi-title">${m.label}</div>
+          <div class="fi-meta">${l.student_id} · ${new Date(l.timestamp).toLocaleTimeString()}</div>
+        </div>
+        <span class="fi-ded">−${l.score_deduction}</span>
+      </div>`;
+  }).join('');
+}
+
+// Init
+const penalties = {
+  'Multiple Faces':    '−20 pts',
+  'Phone Detected':    '−25 pts',
+  'No Face in Frame':  '−10 pts',
+  'Tab Switch':        '−10 pts',
+  'Fullscreen Exit':   '−10 pts',
+  'Suspicious Object': '−15 pts',
+  'Looking Away':      '−5 pts',
+  'Head Turned':       '−5 pts',
+  'Copy/Paste Attempt': '−15 pts',
+  'Keyboard Shortcut Attempt': '−15 pts',
+};
+
+// Populate penalty reference
+const penaltyRef = document.getElementById('penaltyRef');
+penaltyRef.innerHTML = Object.entries(penalties).map(([k,v]) => `
+  <div class="sys-row">
+    <span class="sys-key">${k}</span>
+    <span class="sys-val" style="color:var(--danger)">${v}</span>
+  </div>`).join('');
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

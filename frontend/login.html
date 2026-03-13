@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ExamGuard — Secure Login</title>
+<link rel="stylesheet" href="/static/css/main.css"/>
+<style>
+body { min-height:100vh; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+
+.orb { position:fixed; border-radius:50%; filter:blur(90px); opacity:.14; pointer-events:none; animation:orb-drift 9s ease-in-out infinite; }
+.orb-1 { width:420px; height:420px; background:var(--accent);  top:-130px; left:-130px; }
+.orb-2 { width:340px; height:340px; background:var(--accent2); bottom:-90px; right:-90px; animation-delay:-4.5s; }
+@keyframes orb-drift { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(18px,18px) scale(1.04)} }
+
+.wrapper {
+  position:relative; z-index:10; width:100%; max-width:440px; padding:1.5rem;
+  animation:page-in .55s cubic-bezier(.4,0,.2,1) both;
+}
+@keyframes page-in { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:none} }
+
+.logo-area { text-align:center; margin-bottom:2.5rem; }
+.logo-icon {
+  width:72px; height:72px; margin:0 auto 1rem;
+  background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);
+  border-radius:22px; display:flex; align-items:center; justify-content:center;
+  font-size:30px; animation:icon-pulse 2.8s ease-in-out infinite;
+}
+@keyframes icon-pulse {
+  0%,100%{box-shadow:0 0 0 0 rgba(0,212,255,.4)}
+  50%{box-shadow:0 0 0 14px rgba(0,212,255,0)}
+}
+.logo-area h1 { font-family:var(--mono); font-size:1.9rem; letter-spacing:-.02em; }
+.logo-area h1 span { color:var(--accent); }
+.logo-area p { font-family:var(--mono); font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin-top:.4rem; }
+
+.login-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:2.25rem;
+  box-shadow:0 0 0 1px rgba(0,212,255,.04),0 24px 64px rgba(0,0,0,.45);
+}
+.card-heading { margin-bottom:1.75rem; }
+.card-heading h2 { font-size:1.2rem; font-weight:600; }
+.card-heading p { color:var(--muted); font-size:.875rem; margin-top:.25rem; }
+.field { margin-bottom:1.1rem; }
+
+.btn-login {
+  width:100%; padding:1rem;
+  background:linear-gradient(135deg,var(--accent) 0%,#0099cc 100%);
+  border:none; border-radius:12px; color:#000;
+  font-family:var(--mono); font-size:.875rem; font-weight:700;
+  letter-spacing:.04em; cursor:pointer; margin-top:.5rem; position:relative; overflow:hidden;
+  transition:box-shadow .2s,transform .1s;
+}
+.btn-login::after { content:''; position:absolute; inset:0; background:linear-gradient(135deg,rgba(255,255,255,.18),transparent); opacity:0; transition:opacity .2s; }
+.btn-login:hover { box-shadow:0 8px 28px rgba(0,212,255,.35); }
+.btn-login:hover::after { opacity:1; }
+.btn-login:active { transform:translateY(1px); }
+.btn-login:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+
+.login-alert { margin-top:.9rem; display:none; }
+.demo-box { margin-top:1.4rem; padding:.9rem 1rem; background:rgba(0,212,255,.04); border:1px solid rgba(0,212,255,.1); border-radius:10px; }
+.demo-box p { font-family:var(--mono); font-size:.7rem; color:var(--muted); line-height:1.8; }
+.demo-box strong { color:var(--accent); }
+.badges { display:flex; gap:.5rem; justify-content:center; flex-wrap:wrap; margin-top:1.5rem; }
+.btn-spin { display:none; width:14px; height:14px; border:2px solid rgba(0,0,0,.25); border-top-color:#000; border-radius:50%; animation:spin .55s linear infinite; vertical-align:middle; margin-right:5px; }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+
+<div class="wrapper">
+  <div class="logo-area">
+    <div class="logo-icon">🛡️</div>
+    <h1>Exam<span>Guard</span></h1>
+    <p>AI-Powered Proctoring System</p>
+  </div>
+
+  <div class="login-card">
+    <div class="card-heading">
+      <h2>Secure Student Login</h2>
+      <p>Enter your credentials to begin the proctored examination</p>
+    </div>
+
+    <div class="field">
+      <label class="input-label" for="studentId">Student ID</label>
+      <input class="input" id="studentId" type="text" placeholder="e.g. STU001" autocomplete="off"/>
+    </div>
+    <div class="field">
+      <label class="input-label" for="password">Password</label>
+      <input class="input" id="password" type="password" placeholder="••••••••"/>
+    </div>
+
+    <button class="btn-login" id="loginBtn" onclick="doLogin()">
+      <span class="btn-spin spin" id="btnSpin"></span>
+      <span id="btnLabel">Authenticate &amp; Begin Exam</span>
+    </button>
+
+    <div class="login-alert alert alert-error"   id="errAlert"></div>
+    <div class="login-alert alert alert-success" id="okAlert"></div>
+
+    <div class="demo-box">
+      <p><strong>Demo Accounts:</strong><br/>
+        STU001 / pass123 &nbsp;·&nbsp; STU002 / pass123<br/>
+        STU003 / pass123 &nbsp;·&nbsp; ADMIN / admin123</p>
+    </div>
+  </div>
+
+  <div class="badges">
+    <span class="pill pill-accent">🔐 Encrypted</span>
+    <span class="pill pill-success">🎥 AI Monitored</span>
+    <span class="pill pill-purple">⚡ Real-time</span>
+  </div>
+</div>
+
+<script src="/static/js/examguard.js"></script>
+<script>
+async function doLogin() {
+  const sid = document.getElementById('studentId').value.trim();
+  const pwd = document.getElementById('password').value.trim();
+  hide(); 
+  if (!sid || !pwd) return err('Please enter both Student ID and Password.');
+  loading(true);
+  try {
+    console.log('Attempting login with:', sid);
+    const d = await EG.post('/api/login', { student_id: sid, password: pwd });
+    if (d.success) {
+      EG.session.set(sid, d.name); 
+      ok(`Welcome, ${d.name}! Redirecting…`);
+      // Redirect admin to dashboard, students to exam
+      const redirectUrl = sid.toUpperCase() === 'ADMIN' ? '/dashboard' : '/exam';
+      setTimeout(() => location.href=redirectUrl, 1100);
+    } else { 
+      err(d.message || 'Invalid credentials.'); 
+      loading(false); 
+    }
+  } catch (e) { 
+    console.error('Login error:', e);
+    err('Cannot reach server. Start the Flask backend on port 8000.'); 
+    loading(false); 
+  }
+}
+function loading(on) {
+  document.getElementById('loginBtn').disabled = on;
+  document.getElementById('btnSpin').style.display  = on ? 'inline-block' : 'none';
+  document.getElementById('btnLabel').textContent   = on ? 'Authenticating…' : 'Authenticate & Begin Exam';
+}
+function err(m) { const e=document.getElementById('errAlert'); e.textContent='⚠ '+m; e.style.display='block'; }
+function ok(m)  { const e=document.getElementById('okAlert');  e.textContent='✓ '+m; e.style.display='block'; }
+function hide() { ['errAlert','okAlert'].forEach(id=>document.getElementById(id).style.display='none'); }
+
+document.getElementById('password').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('studentId').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('password').focus(); });
+</script>
+</body>
+</html>
