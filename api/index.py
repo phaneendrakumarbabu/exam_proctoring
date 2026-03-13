@@ -13,5 +13,3 @@ sys.path.insert(0, os.path.join(ROOT, 'ai_modules'))
 
 # Import the Flask app from backend
 from backend.app import app
-
-# Export app for Vercel
